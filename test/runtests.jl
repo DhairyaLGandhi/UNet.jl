@@ -22,3 +22,13 @@ end
   broken_ip = rand(Float32, 299, 299, 1, 1)
   @test_throws DimensionMismatch size(u(broken_ip)) == size(broken_ip)
 end
+
+@testset "Gradient Tests" begin
+  u = Unet()
+  ip = rand(Float32, 256, 256, 1,1)
+  gs = gradient(Flux.params(u)) do
+    sum(u(ip))
+  end
+
+  @test gs isa Grads
+end
