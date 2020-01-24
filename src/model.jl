@@ -68,13 +68,13 @@ function Unet(channels::Int = 1)
   Unet(conv_down_blocks, conv_blocks, up_blocks)
 end
 
-function (u::Unet)(x)
-  outputs = []
-  push!(outputs, u.conv_blocks[1:2](x))
+function (u::UNet)(x)
+  outputs = Vector(undef, 5)
+  outputs[1] = u.conv_blocks[1:2](x)
 
   for i in 2:5
     pool_x = u.conv_down_blocks[i - 1](outputs[i - 1])
-    push!(outputs, u.conv_blocks[i+1](pool_x))
+    outputs[i] = u.conv_blocks[i+1](pool_x)
   end
 
   up_x = u.conv_blocks[7](outputs[end])
