@@ -68,7 +68,7 @@ function Unet(channels::Int = 1)
   Unet(conv_down_blocks, conv_blocks, up_blocks)
 end
 
-function (u::UNet)(x)
+function (u::Unet)(x)
   outputs = Vector(undef, 5)
   outputs[1] = u.conv_blocks[1:2](x)
 
