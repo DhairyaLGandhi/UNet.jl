@@ -86,7 +86,21 @@ function (u::Unet)(x)
   tanh.(u.up_blocks[end](up_x))
 end
 
-# path = joinpath(pathof(PathBio), "..", "..", "deps", "weights", "unet_epoch16_ps3.bson") |> normpath
-# @load path ps3
-# u = UNet()
-# Flux.loadparams!(u, ps3)
+function Base.show(io::IO, u::Unet)
+  println(io, "UNet:")
+
+  for l in u.conv_down_blocks
+    println(io, "  ConvDown($(size(l[1].weight)[end-1]), $(size(l[1].weight)[end]))")
+  end
+
+  println(io, "\n")
+  for l in u.conv_blocks
+    println(io, "  UNetConvBlock($(size(l[1].weight)[end-1]), $(size(l[1].weight)[end]))")
+  end
+
+  println(io, "\n")
+  for l in u.up_blocks
+    l isa UNetUpBlock || continue
+    println(io, "  UNetUpBlock($(size(l.upsample[2].weight)[end]), $(size(l.upsample[2].weight)[end-1]))")
+  end
+end
