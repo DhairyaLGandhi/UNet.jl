@@ -1,6 +1,7 @@
 # UNet.jl
 
 [![Actions Status](https://github.com/dhairyagandhi96/UNet.jl/workflows/ci/badge.svg)](https://github.com/dhairyagandhi96/UNet.jl/actions)
+[![CI Status][ci-img]][ci-url]
 
 This pacakge provides a generic UNet implemented in Julia.
 
