@@ -2,8 +2,6 @@
 
 [![Actions Status](https://github.com/dhairyagandhi96/UNet.jl/workflows/ci/badge.svg)](https://github.com/dhairyagandhi96/UNet.jl/actions)
 
-[![CI Status][ci-img]](ci-url)
-
 This pacakge provides a generic UNet implemented in Julia.
 
 The package is built on top of Flux.jl, and therefore can be extended as needed
