@@ -37,7 +37,7 @@ function load_batch(base::String, name_template = "im",
 
   # TODO: templates should support regexes
   if dir isa Nothing
-    dir = readdir(base)
+    dir = setdiff(readdir(base), ["zips"])
     dir = sample(dir)
   end
 
@@ -63,12 +63,14 @@ function load_batch(base::String, name_template = "im",
     mask = Images.imresize(mask, rsize...)
     img = channelview(img)
     mask = channelview(mask)
+    img = reshape(img, rsize..., channels)
+    mask = reshape(mask, rsize..., channels)
     
     x′ = @view x[:,:,:,i]
-    x′ = img
+    x′ .= img
 
     y′ = @view x[:,:,:,i]
-    y′ = mask
+    y′ .= mask
   end
 
   x, y
