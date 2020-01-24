@@ -39,25 +39,10 @@ julia> u = Unet(3) # for RGB images
 To train the model on UNet, it is as simple as calling `gpu` on the model.
 
 ```julia
-julia> gpu(u)
-UNet:
-  ConvDown(64, 64)
-  ConvDown(128, 128)
-  ConvDown(256, 256)
-  ConvDown(512, 512)
+julia> u = gpu(u);
 
+julia> r = gpu(rand(Float32, 256, 256, 1, 1));
 
-  UNetConvBlock(1, 3)
-  UNetConvBlock(3, 64)
-  UNetConvBlock(64, 128)
-  UNetConvBlock(128, 256)
-  UNetConvBlock(256, 512)
-  UNetConvBlock(512, 1024)
-  UNetConvBlock(1024, 1024)
-
-
-  UNetUpBlock(1024, 512)
-  UNetUpBlock(1024, 256)
-  UNetUpBlock(512, 128)
-  UNetUpBlock(256, 64)
+julia> size(u(r))
+(256, 256, 1, 1)
 ```
