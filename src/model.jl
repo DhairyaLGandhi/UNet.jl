@@ -32,6 +32,11 @@ function (u::UNetUpBlock)(x, bridge)
   return cat(x, bridge, dims = 3)
 end
 
+"""
+    Unet(channels::Int = 1)
+
+  Initializes a [UNet](https://arxiv.org/pdf/1505.04597.pdf) instance with the given number of channels, typically equal to the number of channels in the input images.
+"""
 struct Unet
   conv_down_blocks
   conv_blocks
