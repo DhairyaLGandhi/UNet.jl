@@ -53,5 +53,28 @@ julia> size(u(r))
 
 Training UNet is a breeze too.
 
+You can define your own loss function, or use a provided Binary Cross Entropy implementation via `bce`.
+
+```julia
+julia> w = rand(Float32, 256,256,1,1);
+
+julia> w′ = rand(Float32, 256,256,1,1);
+
+julia> function loss(x, y)
+         op = clamp.(u(x), 0.001f0, 1.f0)
+         mean(bce(op, y))
+       end
+loss (generic function with 1 method)
+
+julia> using Base.Iterators
+
+julia> rep = Iterators.repeated((w, w′), 10);
+
+julia> opt = Momentum()
+Momentum(0.01, 0.9, IdDict{Any,Any}())
+
+julia> Flux.train!(loss, Flux.params(u), rep, opt);
+```
+
 ## Further Reading
 The package is an implementation of the [paper](https://arxiv.org/pdf/1505.04597.pdf), and all credits of the model itself go to the respective authors.
