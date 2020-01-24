@@ -1,7 +1,5 @@
 using StatsBase: sample, shuffle
 
-const base = joinpath(homedir(), "pathbio")
-
 """
   stub -> <one of the dirs>/<img path> - _im/cr.tif
 """
