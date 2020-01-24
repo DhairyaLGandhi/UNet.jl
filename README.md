@@ -34,6 +34,8 @@ To default input channel dimension is expected to be `1` ie. grayscale. To suppo
 julia> u = Unet(3) # for RGB images
 ```
 
+The input size can be any power of two sized batch. Something like `(256,256, channels, batch_size)`.
+
 ## GPU Support
 
 To train the model on UNet, it is as simple as calling `gpu` on the model.
@@ -46,3 +48,10 @@ julia> r = gpu(rand(Float32, 256, 256, 1, 1));
 julia> size(u(r))
 (256, 256, 1, 1)
 ```
+
+## Training
+
+Training UNet is a breeze too.
+
+## Further Reading
+The package is an implementation of the [paper](https://arxiv.org/pdf/1505.04597.pdf), and all credits of the model itself go to the respective authors.
