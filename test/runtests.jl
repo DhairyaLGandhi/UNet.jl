@@ -1,4 +1,5 @@
 using Test, UNet
+using UNet.Flux, UNet.Flux.Zygote
 
 @testset "Inference" begin
 
@@ -30,5 +31,5 @@ end
     sum(u(ip))
   end
 
-  @test gs isa Grads
+  @test gs isa Zygote.Grads
 end
