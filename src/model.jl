@@ -68,7 +68,7 @@ function Unet(channels::Int = 1)
   Unet(conv_down_blocks, conv_blocks, up_blocks)
 end
 
-function (u::UNet)(x::AbstractArray)
+function (u::Unet)(x::AbstractArray)
   op = u.conv_blocks[1:2](x)
 
   x1 = u.conv_blocks[3](u.conv_down_blocks[1](op))
