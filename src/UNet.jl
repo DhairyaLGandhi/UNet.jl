@@ -7,7 +7,9 @@ using Reexport
 using Flux
 using Flux: @functor
 
-using Images
+using ImageCore
+using ImageTransformations: imresize
+using FileIO
 using Distributions: Normal
 
 @reexport using Statistics
