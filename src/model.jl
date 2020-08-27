@@ -21,11 +21,14 @@ end
 @functor UNetUpBlock
 
 UNetUpBlock(in_chs::Int, out_chs::Int; kernel = (3, 3), p = 0.5f0) = 
-    UNetUpBlock(Chain(x->leakyrelu.(x,0.2f0),
-       		ConvTranspose((2, 2), in_chs=>out_chs,
-			stride=(2, 2);init=_random_normal),
-		BatchNormWrap(out_chs),
-		Dropout(p)))
+    UNetUpBlock( 
+      Chain(
+        x->leakyrelu.(x,0.2f0),
+        ConvTranspose((2, 2), in_chs=>out_chs, stride=(2, 2);init=_random_normal),
+        BatchNormWrap(out_chs),
+        Dropout(p)
+        )
+    )
 
 function (u::UNetUpBlock)(x, bridge)
   x = u.upsample(x)
@@ -45,13 +48,15 @@ end
 
 @functor Unet
 
-function Unet(channels::Int = 1)
-  conv_down_blocks = Chain(ConvDown(64,64),
+function Unet(channels::Int = 3, nlabels::Int = 7)
+  conv_down_blocks = Chain(
+          ConvDown(64,64),
 		      ConvDown(128,128),
 		      ConvDown(256,256),
 		      ConvDown(512,512))
 
-  conv_blocks = Chain(UNetConvBlock(channels, 3),
+  conv_blocks = Chain(
+     UNetConvBlock(channels, 3),
 		 UNetConvBlock(3, 64),
 		 UNetConvBlock(64, 128),
 		 UNetConvBlock(128, 256),
@@ -59,12 +64,15 @@ function Unet(channels::Int = 1)
 		 UNetConvBlock(512, 1024),
 		 UNetConvBlock(1024, 1024))
 
-  up_blocks = Chain(UNetUpBlock(1024, 512),
+  up_blocks = Chain(
+    UNetUpBlock(1024, 512),
 		UNetUpBlock(1024, 256),
 		UNetUpBlock(512, 128),
 		UNetUpBlock(256, 64,p = 0.0f0),
-		Chain(x->leakyrelu.(x,0.2f0),
-		Conv((1, 1), 128=>channels;init=_random_normal)))									  
+    Chain(x->leakyrelu.(x,0.2f0), Conv((1, 1), 128=>nlabels;init=_random_normal))
+    )									  
+  
+    
   Unet(conv_down_blocks, conv_blocks, up_blocks)
 end
 
@@ -82,7 +90,9 @@ function (u::Unet)(x::AbstractArray)
   up_x2 = u.up_blocks[2](up_x1, x2)
   up_x3 = u.up_blocks[3](up_x2, x1)
   up_x5 = u.up_blocks[4](up_x3, op)
-  tanh.(u.up_blocks[end](up_x5))
+  probs = softmax(u.up_blocks[end](up_x5), )
+
+  return probs
 end
 
 function Base.show(io::IO, u::Unet)
