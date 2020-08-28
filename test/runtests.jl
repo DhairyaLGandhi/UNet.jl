@@ -71,7 +71,7 @@ using JLD
   lr = 0.001
   @show opt = ADAM(lr)
   for i =1:nEpochs
-    Flux.train!(loss2, Flux.params(u), [(input, onehottarget)], opt)
+    Flux.train!(loss, Flux.params(u), [(input, onehottarget)], opt)
     if i % 10 == 0
       opt.eta = maximum([1e-5, opt.eta/2.0])
       @info "New LR $(opt.eta)"
