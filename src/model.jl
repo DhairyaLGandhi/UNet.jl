@@ -45,7 +45,7 @@ end
 
 @functor Unet
 
-function Unet(channels::Int = 1)
+function Unet(channels::Int = 1, labels::Int = channels)
   conv_down_blocks = Chain(ConvDown(64,64),
 		      ConvDown(128,128),
 		      ConvDown(256,256),
@@ -64,7 +64,7 @@ function Unet(channels::Int = 1)
 		UNetUpBlock(512, 128),
 		UNetUpBlock(256, 64,p = 0.0f0),
 		Chain(x->leakyrelu.(x,0.2f0),
-		Conv((1, 1), 128=>channels;init=_random_normal)))									  
+		Conv((1, 1), 128=>labels;init=_random_normal)))									  
   Unet(conv_down_blocks, conv_blocks, up_blocks)
 end
 
