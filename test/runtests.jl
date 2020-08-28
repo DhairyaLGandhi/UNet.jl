@@ -42,49 +42,52 @@ using JLD
 
 @testset "Training test" begin
 
-  test_img = zeros(UInt8,(256, 256))
-  Images.save("test.png", test_img )
-
-  println(size(test_img))
-  println(typeof(test_img))
-  
   input = Float32.(reshape(channelview(load("./test/trainingdata/input.png")), 256, 256, 3, 1))
-
-  
   target = reshape(load("./test/trainingdata/target.png"), 256, 256, 1, 1)
   ulabels = sort(unique(target))
-  itarget = Float32.(map(v -> findall(ulabels .== v)[1],target))
+  itarget = Int32.(map(v -> findall(ulabels .== v)[1],target))
 
-  data = Iterators.repeated((input, itarget), 500)
+  onehottarget = zeros(Int32, 256, 256, 7, 1)
 
-  println(typeof(input))
-  println(typeof(itarget))
-  
-  u = Unet(3, 7)
-  opt = ADAM()
-  function loss(x,y)
-    l = Flux.crossentropy(u(x),y)
-    println(l)
-    return l
+  for i=1:256
+    for j=1:256
+      k = itarget[i, j, 1, 1]
+      onehottarget[i, j, k, 1] = 1
+    end
   end
-  
-  Flux.train!(loss, Flux.params(u), data, opt)
 
+  println(itarget[125, 125, 1, 1])
+  println(onehottarget[125, 125, :, 1])
 
-  probs = dropdims(u(input); dims = 4)
-  maxprob, cartindx = findmax(probs; dims = 3)
-  pred = dropdims(map(v -> v[3], cartindx); dims = 3)
-  pred = UInt8.(30*pred)
-  
-  println(size(pred))
-  println(typeof(pred))
+  data = Iterators.repeated((input, itarget), 1)
 
+  u = Unet(3, 7)
 
+  function loss(x,y)
+      Flux.logitcrossentropy(u(x), y; dims=3)
+  end
 
-  Images.save("test.png", pred)
+  nEpochs = 1000
+  lr = 0.001
+  @show opt = ADAM(lr)
+  for i =1:nEpochs
+    Flux.train!(loss2, Flux.params(u), [(input, onehottarget)], opt)
+    if i % 10 == 0
+      opt.eta = maximum([1e-5, opt.eta/2.0])
+      @info "New LR $(opt.eta)"
 
-  @save "unet3.jld" u
+      probs = dropdims(u(input); dims = 4)
+      maxprob, cartindx = findmax(probs; dims = 3)
+      pred = dropdims(map(v -> v[3]-1, cartindx); dims = 3)
+      
+      # @show itarget[100:105, 100:105, 1, 1]
+      # @show pred[100:105, 100:105]
+    
+      pred = UInt8.(40*pred)
+      Images.save("test_$(i).png", pred)
+    end
+  end
 
-  maximum
+  @save "unet.jld" u
 
 end

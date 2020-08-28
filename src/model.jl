@@ -69,7 +69,7 @@ function Unet(channels::Int = 3, nlabels::Int = 7)
 		UNetUpBlock(1024, 256),
 		UNetUpBlock(512, 128),
 		UNetUpBlock(256, 64,p = 0.0f0),
-    Chain(x->leakyrelu.(x,0.2f0), Conv((1, 1), 128=>nlabels;init=_random_normal))
+    Chain(x->leakyrelu.(x,0.2f0), Conv((1, 1), 128=>nlabels; init=_random_normal))
     )									  
   
     
@@ -78,7 +78,6 @@ end
 
 function (u::Unet)(x::AbstractArray)
   op = u.conv_blocks[1:2](x)
-
   x1 = u.conv_blocks[3](u.conv_down_blocks[1](op))
   x2 = u.conv_blocks[4](u.conv_down_blocks[2](x1))
   x3 = u.conv_blocks[5](u.conv_down_blocks[3](x2))
@@ -90,9 +89,8 @@ function (u::Unet)(x::AbstractArray)
   up_x2 = u.up_blocks[2](up_x1, x2)
   up_x3 = u.up_blocks[3](up_x2, x1)
   up_x5 = u.up_blocks[4](up_x3, op)
-  probs = softmax(u.up_blocks[end](up_x5), )
+  u.up_blocks[end](up_x5)
 
-  return probs
 end
 
 function Base.show(io::IO, u::Unet)
