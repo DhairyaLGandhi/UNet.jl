@@ -30,13 +30,20 @@ UNet:
   UNetUpBlock(256, 64)
 ```
 
-To default input channel dimension is expected to be `1` ie. grayscale. To support different channel images, you can pass the `channels` to `Unet`.
+The default input channel dimension is expected to be `1` ie. grayscale. To support different channel images, you can pass the `channels` to `Unet`.
 
 ```julia
 julia> u = Unet(3) # for RGB images
 ```
 
 The input size can be any power of two sized batch. Something like `(256,256, channels, batch_size)`.
+
+The default output channel dimension is the input channel dimension. So, `1` for a `Unet()` and e.g. `3` for a `Unet(3)`.
+The output channel dimension can be set by supplying a second argument:
+
+```julia
+julia> u = Unet(3, 5) # 3 input channels, 5 output channels.
+```
 
 ## GPU Support
 

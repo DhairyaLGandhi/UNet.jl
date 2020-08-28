@@ -33,9 +33,10 @@ function (u::UNetUpBlock)(x, bridge)
 end
 
 """
-    Unet(channels::Int = 1)
+    Unet(channels::Int = 1, labels::Int = channels)
 
-  Initializes a [UNet](https://arxiv.org/pdf/1505.04597.pdf) instance with the given number of channels, typically equal to the number of channels in the input images.
+  Initializes a [UNet](https://arxiv.org/pdf/1505.04597.pdf) instance with the given number of `channels`, typically equal to the number of channels in the input images.
+  `labels`, equal to the number of input channels by default, specifies the number of output channels.
 """
 struct Unet
   conv_down_blocks
