@@ -9,6 +9,10 @@ using UNet.Flux, UNet.Flux.Zygote
 
     @test size(u(ip)) == size(ip)
   end
+
+  u = Unet(2,5)
+  ip = rand(Float32, 256, 256, 2, 1)
+  @test size(u(ip)) == (256, 256, 5, 1) 
 end
 
 @testset "Variable Sizes" begin
