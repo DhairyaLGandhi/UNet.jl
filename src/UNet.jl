@@ -1,6 +1,6 @@
 module UNet
 
-export Unet, bce, load_img, load_batch
+export Unet
 
 using Reexport
 
@@ -16,7 +16,6 @@ using Distributions: Normal
 @reexport using Flux, Flux.Zygote, Flux.Optimise
 
 include("utils.jl")
-include("dataloader.jl")
 include("model.jl")
 
 end # module
