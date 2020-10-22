@@ -7,8 +7,8 @@ using JLD
 
 @testset "Overfitting test" begin
 
-  input = Float32.(reshape(channelview(load("./test/trainingdata/input.png")), 256, 256, 3, 1))
-  target = reshape(load("./test/trainingdata/target.png"), 256, 256, 1, 1)
+  input = Float32.(reshape(channelview(load("./test/testdata/input.png")), 256, 256, 3, 1))
+  target = reshape(load("./test/testdata/target.png"), 256, 256, 1, 1)
   ulabels = sort(unique(target))
   itarget = Int32.(map(v -> findall(ulabels .== v)[1],target))
 
@@ -52,8 +52,8 @@ using JLD
   maxprob, cartindx = findmax(probs; dims = 3)
   pred = dropdims(map(v -> v[3]-1, cartindx); dims = 3)
   pred = UInt8.(40*pred)
-  Images.save("./test/trainingdata/prediction.png", pred)
+  Images.save("./test/testdata/prediction.png", pred)
 
-  @save "./test/trainingdata/unet_model.jld" u
+  @save "./test/testdata/unet_model.jld" u
 
 end
