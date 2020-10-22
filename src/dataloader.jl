@@ -70,14 +70,18 @@ end
 
 function grab_random_files(dataset::Dataset, num_files::Int; drop_processed = true)
 
-    idx = unique(sample(dataset.input_files_keys, min(dataset.input_num_files, num_files)))
+    idx = sample(dataset.input_files_keys, min(dataset.input_num_files, num_files)) #this is not unique, some files are duplicated
     input_files = []
     target_files = []
 
     for i in idx
         push!(input_files, dataset.input_files[i])
         push!(target_files, dataset.target_files[i])
-        if drop_processed
+        
+    end
+
+    if drop_processed
+        for i in unique(idx)
             pop!(dataset.input_files,i)
             pop!(dataset.target_files,i)
         end
@@ -110,7 +114,7 @@ function load_files(input_files::Array, target_files::Array)
 
     nfiles = length(target_files)
     s = size(channelview(load(target_files[1]))) 
-    onehotlabels = zeros(Int32, s[1], s[2], nfeatures, nfiles)
+    onehotlabels = zeros(Int8, s[1], s[2], nfeatures, nfiles)
     weights = zeros(nfeatures, nfiles)
     i = 1
     for file in target_files
@@ -120,8 +124,8 @@ function load_files(input_files::Array, target_files::Array)
         i = i + 1
     end
 
-    return convert(Array{Float32}, data), convert(Array{Int8}, onehotlabels), convert(Array{Float32}, weights)
-
+    #return convert(Array{Float32}, data), convert(Array{Int8}, onehotlabels), convert(Array{Float32}, weights)
+    return data, onehotlabels, weights
 end
 
 function get_integer_intensity(value::Normed{UInt8,8})

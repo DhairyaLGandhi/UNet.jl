@@ -4,17 +4,25 @@ using Base.Iterators
 using FileIO
 using Images
 
-test_dir_input ="/home/rzietal/git/UNet.jl/test/data/png/testing/input/"
-test_dir_target ="/home/rzietal/git/UNet.jl/test/data/png/testing/target/"
+# test_dir_input ="/home/rzietal/git/UNet.jl/test/data/png/testing/input/"
+# test_dir_target ="/home/rzietal/git/UNet.jl/test/data/png/testing/target/"
 
-train_dir_input ="/home/rzietal/git/UNet.jl/test/data/png/training/input/"
-train_dir_target ="/home/rzietal/git/UNet.jl/test/data/png/training/target/"
+# train_dir_input ="/home/rzietal/git/UNet.jl/test/data/png/training/input/"
+# train_dir_target ="/home/rzietal/git/UNet.jl/test/data/png/training/target/"
 
-model_dir = "/home/rzietal/git/UNet.jl/test/data/models"
+# model_dir = "/home/rzietal/git/UNet.jl/test/data/models"
 
-nepochs = 1
-numfiles = 20
-batchsize = 5
+test_dir_input ="D:\\Projects\\UNet.jl\\test\\data\\png\\testing\\input"
+test_dir_target ="D:\\Projects\\UNet.jl\\test\\data\\png\\testing\\target"
+
+train_dir_input ="D:\\Projects\\UNet.jl\\test\\data\\png\\training\\input"
+train_dir_target ="D:\\Projects\\UNet.jl\\test\\data\\png\\training\\target"
+
+model_dir = "D:\\Projects\\UNet.jl\\test\\data\\models"
+
+nepochs = 100
+numfiles = 2
+batchsize = 2
 lr = 0.005
 lr_drop_rate = 0.95
 lr_step = 10

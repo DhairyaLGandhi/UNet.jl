@@ -5,12 +5,12 @@ function BatchNormWrap(out_ch)
 end
 
 UNetConvBlock(in_chs, out_chs, kernel = (3, 3)) =
-    Chain(Conv(kernel, in_chs=>out_chs,pad = (1, 1);init=_random_normal),
+    Chain(Conv(kernel, in_chs=>out_chs,pad = (1, 1)),
 	BatchNormWrap(out_chs),
 	x->leakyrelu.(x,0.2f0))
 
 ConvDown(in_chs,out_chs,kernel = (4,4)) =
-  Chain(Conv(kernel,in_chs=>out_chs,pad=(1,1),stride=(2,2);init=_random_normal),
+  Chain(Conv(kernel,in_chs=>out_chs,pad=(1,1),stride=(2,2)),
 	BatchNormWrap(out_chs),
 	x->leakyrelu.(x,0.2f0))
 
@@ -24,13 +24,13 @@ UNetUpBlock(in_chs::Int, out_chs::Int; kernel = (3, 3), p = 0.5f0) =
     UNetUpBlock( 
       Chain(
         x->leakyrelu.(x,0.2f0),
-        ConvTranspose((2, 2), in_chs=>out_chs, stride=(2, 2);init=_random_normal),
+        ConvTranspose((2, 2), in_chs=>out_chs, stride=(2, 2)),
         BatchNormWrap(out_chs),
         Dropout(p)
         )
     )
 
-function (u::UNetUpBlock)(x, bridge)
+function (u::UNetUpBlock)(x::AbstractArray{T}, bridge::AbstractArray{T}) where T
   x = u.upsample(x)
   return cat(x, bridge, dims = 3)
 end
@@ -69,27 +69,37 @@ function Unet(channels::Int = 3, nlabels::Int = 7)
 		UNetUpBlock(1024, 256),
 		UNetUpBlock(512, 128),
 		UNetUpBlock(256, 64,p = 0.0f0),
-    Chain(x->leakyrelu.(x,0.2f0), Conv((1, 1), 128=>nlabels; init=_random_normal))
+    Chain(x->leakyrelu.(x,0.2f0), Conv((1, 1), 128=>nlabels))
     )									  
   
     
   Unet(conv_down_blocks, conv_blocks, up_blocks)
 end
 
-function (u::Unet)(x::AbstractArray)
+function (u::Unet)(x::AbstractArray{T}) where T
+  #@info "..."
   op = u.conv_blocks[1:2](x)
+
   x1 = u.conv_blocks[3](u.conv_down_blocks[1](op))
+
   x2 = u.conv_blocks[4](u.conv_down_blocks[2](x1))
+
   x3 = u.conv_blocks[5](u.conv_down_blocks[3](x2))
+
   x4 = u.conv_blocks[6](u.conv_down_blocks[4](x3))
 
   up_x4 = u.conv_blocks[7](x4)
 
   up_x1 = u.up_blocks[1](up_x4, x3)
+
   up_x2 = u.up_blocks[2](up_x1, x2)
+
   up_x3 = u.up_blocks[3](up_x2, x1)
+
   up_x5 = u.up_blocks[4](up_x3, op)
-  u.up_blocks[end](up_x5)
+
+  ou = u.up_blocks[end](up_x5)
+  return ou
 
 end
 

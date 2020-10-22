@@ -14,8 +14,6 @@ function loss_all(dataloader, model)
     l/length(dataloader)
 end
 
-
-
 function train(train_dir_input, train_dir_target, test_dir_input, test_dir_target, nepochs, numfiles, batchsize, lr, lr_drop_rate, lr_step, model_dir)
 
     #initialize datasets
@@ -23,24 +21,20 @@ function train(train_dir_input, train_dir_target, test_dir_input, test_dir_targe
     test_dataset = initialize_dataset("test"; input_dir = test_dir_input, target_dir = test_dir_target)
     
     # Construct model
+    #CUDA.allowscalar(false)
     m = Unet(nchannels, nfeatures) |> gpu
-
-    function loss(x,y)
-        logitcrossentropy(m(x), y; dims=3)
+ 
+    function loss(x::AbstractArray{T}, y) where T
+        return logitcrossentropy(m(x), y)
     end
 
     # Load testing data 
     test_batch_input_files, test_batch_target_files = grab_random_files(test_dataset, 10; drop_processed = false)
     xtest, ytest, wtrain = load_files(test_batch_input_files, test_batch_target_files)
 
-    @show typeof(xtest)
-    @show size(xtest)
-    @show typeof(ytest)
-    @show size(ytest)
+    test_data = DataLoader(xtest |> gpu, ytest |> gpu, batchsize=batchsize, shuffle=true) |> gpu
 
-    test_data = DataLoader(xtest |> gpu, ytest |> gpu, batchsize=batchsize) |> gpu
-
-    evalcb = () -> @show(loss_all(test_data, m))
+    evalcb = () -> @info "Minibatch loss: $(loss_all(test_data, m))"
 
     opt = ADAM(lr)
 
@@ -52,18 +46,16 @@ function train(train_dir_input, train_dir_target, test_dir_input, test_dir_targe
         while train_dataset.input_num_files > 0
 
             # Load training data 
-            train_batch_input_files, train_batch_target_files = grab_random_files(test_dataset, numfiles)
+
+            train_batch_input_files, train_batch_target_files = grab_random_files(train_dataset, numfiles)
             xtrain, ytrain, wtrain = load_files(train_batch_input_files, train_batch_target_files)
 
-            @show typeof(xtrain)
-            @show size(xtrain)
-            @show typeof(ytrain)
-            @show size(ytrain)
-            train_data = DataLoader(xtrain |> gpu, ytrain |> gpu, batchsize=batchsize, shuffle=true) |> gpu
+            #train_data = DataLoader(xtrain |> gpu, ytrain |> gpu, batchsize=2, shuffle=true) |> gpu
+            train_data = [(xtrain, ytrain)] |> gpu
 
-            @info "Training..."
-            Flux.train!(loss, params(m), train_data, opt, cb = evalcb)
-
+            @info "Training minibatch..."
+            Flux.train!(loss, Flux.params(m), train_data, opt, cb = evalcb)
+            @info "Done!"
         end
 
         #re-initialize dataset after all files processed

@@ -1,6 +1,5 @@
 module UNet
 
-using Reexport
 using StatsBase
 using Flux
 using Flux: @functor
@@ -10,15 +9,12 @@ using Flux: logitcrossentropy
 using ImageCore
 using ImageTransformations: imresize
 using FileIO
-using Distributions: Normal
+#using Distributions: Normal
 using Serialization
-
+using ForwardDiff
 using Parameters: @with_kw
 using CUDAapi
 using CUDA
-
-@reexport using Statistics
-@reexport using Flux, Flux.Zygote, Flux.Optimise
 
 include("defaults.jl")
 include("utils.jl")
