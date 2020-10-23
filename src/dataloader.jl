@@ -146,7 +146,6 @@ function target_to_onehot(target, nfeatures)
     for i=1:s[1]
         for j=1:s[1]
         k = itarget[i, j, 1]
-        onehottarget[i, j, k] = k # this should be 1 but we'll put labels here, acts like weights in the cost function 
         weights[k] += 1
         end
     end
@@ -154,6 +153,13 @@ function target_to_onehot(target, nfeatures)
     weights = weights/maximum(weights)
     weights = 1 .+ (1 .- weights) .* 100
     weights = Int8.(round.(weights))
+
+    for i=1:s[1]
+        for j=1:s[1]
+        k = itarget[i, j, 1]
+        onehottarget[i, j, k] = weights[k] # this should be 1 but we'll put weights here to balnce things out 
+        end
+    end
 
     return onehottarget, weights
 
