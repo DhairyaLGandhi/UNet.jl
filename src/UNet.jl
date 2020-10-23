@@ -4,12 +4,13 @@ using StatsBase
 using Flux
 using Flux: @functor
 using Flux.Data: DataLoader
-using Flux: logitcrossentropy
+using Flux: logitcrossentropy, dice_coeff_loss
 
+using Images
 using ImageCore
 using ImageTransformations: imresize
 using FileIO
-#using Distributions: Normal
+
 using Serialization
 using ForwardDiff
 using Parameters: @with_kw

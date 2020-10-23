@@ -1,10 +1,15 @@
-# function accuracy(data_loader, model)
-#     acc = 0
-#     for (x,y) in data_loader
-#         acc += sum(onecold(cpu(model(x))) .== onecold(cpu(y)))*1 / size(x,2)
-#     end
-#     acc/length(data_loader)
-# end
+function dicecoefficient(data, model)
+    @info "Computing dice coefficient..."
+    dice = 0
+    x, y = data
+    s = size(x)
+    for i = 1:s[4]
+        pred = probs_to_image(model, x[:,:,:,i:i])
+        Images.save("test_$(i).png", UInt8.(pred |> cpu))
+        dice += dice_coeff_loss(pred, y[:,:,i])
+    end
+    dice/s[4]
+end
 
 function loss_all(dataloader, model)
     l = 0f0
@@ -12,6 +17,17 @@ function loss_all(dataloader, model)
         l += logitcrossentropy(model(x), y; dims=3)
     end
     l/length(dataloader)
+end
+
+function probs_to_image(model, input)
+
+    probs = dropdims(model(input); dims = 4)
+    maxprob, cartindx = findmax(probs; dims = 3)
+    pred = dropdims(map(v -> v[3]-1, cartindx); dims = 3)
+      
+    pred = Int16.(30*pred)
+
+    return pred
 end
 
 function train(train_dir_input, train_dir_target, test_dir_input, test_dir_target, nepochs, numfiles, batchsize, lr, lr_drop_rate, lr_step, model_dir)
@@ -30,9 +46,10 @@ function train(train_dir_input, train_dir_target, test_dir_input, test_dir_targe
 
     # Load testing data 
     test_batch_input_files, test_batch_target_files = grab_random_files(test_dataset, 10; drop_processed = false)
-    xtest, ytest, wtrain = load_files(test_batch_input_files, test_batch_target_files)
+    xtest, ytest, wtest = load_files(test_batch_input_files, test_batch_target_files)
 
     test_data = DataLoader(xtest |> gpu, ytest |> gpu, batchsize=batchsize, shuffle=true) |> gpu
+    dice_test_data = (xtest, wtest) |> gpu
 
     evalcb = () -> @info "Minibatch loss: $(loss_all(test_data, m))"
 
@@ -53,18 +70,16 @@ function train(train_dir_input, train_dir_target, test_dir_input, test_dir_targe
             #train_data = DataLoader(xtrain |> gpu, ytrain |> gpu, batchsize=2, shuffle=true) |> gpu
             train_data = [(xtrain, ytrain)] |> gpu
 
-            @info "Training minibatch..."
             Flux.train!(loss, Flux.params(m), train_data, opt, cb = evalcb)
-            @info "Done!"
         end
 
         #re-initialize dataset after all files processed
         train_dataset = initialize_dataset("train"; input_dir = train_dir_input, target_dir = train_dir_target)
 
-        test_accuracy = loss_all(test_data, m)
+        test_accuracy = dicecoefficient(dice_test_data, m)
 
         #print out accuracies
-        @info "Accuracy on a testing set $(test_accuracy)"
+        @info "Dice coefficient on a testing set $(test_accuracy)"
 
         acc = string(test_accuracy)
         acc = acc[1:min(6,length(acc))]

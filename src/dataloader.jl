@@ -115,17 +115,19 @@ function load_files(input_files::Array, target_files::Array)
     nfiles = length(target_files)
     s = size(channelview(load(target_files[1]))) 
     onehotlabels = zeros(Int8, s[1], s[2], nfeatures, nfiles)
+    itargets = zeros(Int16, s[1], s[2], nfiles)
     weights = zeros(nfeatures, nfiles)
     i = 1
     for file in target_files
         target = channelview(load(file))
+        itargets[:,:,i] = Int16.(get_integer_intensity.(target))
         @assert s == size(target) "Input images are not of the same size. Please check!"
         onehotlabels[:,:,:,i], weights[:,i] = target_to_onehot(target, nfeatures)
         i = i + 1
     end
 
     #return convert(Array{Float32}, data), convert(Array{Int8}, onehotlabels), convert(Array{Float32}, weights)
-    return data, onehotlabels, weights
+    return data, onehotlabels, itargets
 end
 
 function get_integer_intensity(value::Normed{UInt8,8})
