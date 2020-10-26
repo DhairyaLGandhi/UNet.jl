@@ -8,3 +8,8 @@ The package is an implementation of the [paper](https://arxiv.org/pdf/1505.04597
 ## Usage
 
 See runtests.jl to see how to overfit a single image, also train.jl for a generic training script.
+
+Input: ![GitHub Logo](/test/testdata/input.png)
+Target: ![GitHub Logo](/test/testdata/target.png)
+Prediction: ![GitHub Logo](/test/testdata/prediction.png)
+Training: ![GitHub Logo](/test/testdata/training.gif)
