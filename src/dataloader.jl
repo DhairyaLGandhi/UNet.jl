@@ -114,7 +114,7 @@ function load_files(input_files::Array, target_files::Array)
 
     nfiles = length(target_files)
     s = size(channelview(load(target_files[1]))) 
-    onehotlabels = zeros(Int8, s[1], s[2], nfeatures, nfiles)
+    onehotlabels = zeros(Int32, s[1], s[2], nfeatures, nfiles)
     itargets = zeros(Int16, s[1], s[2], nfiles)
     weights = zeros(nfeatures, nfiles)
     i = 1
@@ -138,7 +138,6 @@ function target_to_onehot(target, nfeatures)
 
     s = size(target)
     onehottarget = zeros(Int32, s[1], s[2], nfeatures)
-    ulabels = sort(unique(target)) #nfeatures defined in defaults.jl
     itarget = 1 .+ Int8.(get_integer_intensity.(target) ./ 30)
     
     weights = zeros(nfeatures)
@@ -151,8 +150,8 @@ function target_to_onehot(target, nfeatures)
     end
 
     weights = weights/maximum(weights)
-    weights = 1 .+ (1 .- weights) .* 100
-    weights = Int8.(round.(weights))
+    weights = 1 .+ (1 .- weights) .* 1000
+    weights = Int.(round.(weights))
 
     for i=1:s[1]
         for j=1:s[1]

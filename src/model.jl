@@ -1,9 +1,9 @@
 DoubleConv(in_channels, out_channels; conv_kernel = (3,3), conv_pad = (1,1)) = 
     Chain(
         Conv(conv_kernel, in_channels=>out_channels, pad = conv_pad),
-        BatchNorm(out_channels, relu),
+        BatchNorm(out_channels, selu),
         Conv(conv_kernel, out_channels=>out_channels, pad = conv_pad),
-        BatchNorm(out_channels, relu),
+        BatchNorm(out_channels, selu),
     )
 
 PoolDrop(;pool_kernel = (2,2), pool_stride = (2,2), pool_padding = (1,1), drop_prob = 0.5) = 

@@ -12,4 +12,4 @@ function squeeze(x::AbstractArray{T}) where T
     end
 end
 
-Base.Float32(x::ForwardDiff.Dual{Nothing,Float32,1}) = x
+#Base.Float32(x::ForwardDiff.Dual{Nothing,Float32,1}) = x
