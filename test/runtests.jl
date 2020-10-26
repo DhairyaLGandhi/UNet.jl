@@ -43,7 +43,7 @@ using JLD
       maxprob, cartindx = findmax(probs; dims = 3)
       pred = dropdims(map(v -> v[3]-1, cartindx); dims = 3)
       
-      pred = UInt8.(40*pred)
+      pred = UInt8.(30*pred)
       Images.save("test_$(i).png", pred)
     end
   end
