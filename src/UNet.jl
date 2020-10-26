@@ -18,7 +18,6 @@ using CUDAapi
 using CUDA
 
 include("defaults.jl")
-include("utils.jl")
 include("dataloader.jl")
 include("model.jl")
 include("train.jl")
