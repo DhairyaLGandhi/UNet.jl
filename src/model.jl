@@ -1,123 +1,113 @@
-function BatchNormWrap(out_ch)
-    Chain(x->expand_dims(x,2),
-	  BatchNorm(out_ch),
-	  x->squeeze(x))
+DoubleConv(in_channels, out_channels; conv_kernel = (3,3), conv_pad = (1,1)) = 
+    Chain(
+        Conv(conv_kernel, in_channels=>out_channels, pad = conv_pad),
+        BatchNorm(out_channels, relu),
+        Conv(conv_kernel, out_channels=>out_channels, pad = conv_pad),
+        BatchNorm(out_channels, relu),
+    )
+
+PoolDrop(;pool_kernel = (2,2), pool_stride = (2,2), pool_padding = (1,1), drop_prob = 0.5) = 
+    Chain(
+        MaxPool(pool_kernel; pad = pool_padding, stride = pool_stride),
+        Dropout(drop_prob)
+    )
+
+struct UpSample
+    upsample
 end
 
-UNetConvBlock(in_chs, out_chs, kernel = (3, 3)) =
-    Chain(Conv(kernel, in_chs=>out_chs,pad = (1, 1)),
-	BatchNormWrap(out_chs),
-	x->leakyrelu.(x,0.2f0))
+@functor UpSample
 
-ConvDown(in_chs,out_chs,kernel = (4,4)) =
-  Chain(Conv(kernel,in_chs=>out_chs,pad=(1,1),stride=(2,2)),
-	BatchNormWrap(out_chs),
-	x->leakyrelu.(x,0.2f0))
-
-struct UNetUpBlock
-  upsample
-end
-
-@functor UNetUpBlock
-
-UNetUpBlock(in_chs::Int, out_chs::Int; kernel = (3, 3), p = 0.5f0) = 
-    UNetUpBlock( 
-      Chain(
-        x->leakyrelu.(x,0.2f0),
-        ConvTranspose((2, 2), in_chs=>out_chs, stride=(2, 2)),
-        BatchNormWrap(out_chs),
-        Dropout(p)
+UpSample(in_channels, out_channels; dconv_kernel = (3,3), dconv_pad = (1,1), dconv_stride = (2,2), drop_prob = 0.5) = 
+    UpSample(
+        Chain(
+            ConvTranspose(dconv_kernel, in_channels=>out_channels, stride=dconv_stride, pad = dconv_pad), 
+            Dropout(drop_prob)   
         )
     )
 
-function (u::UNetUpBlock)(x::AbstractArray{T}, bridge::AbstractArray{T}) where T
-  x = u.upsample(x)
-  return cat(x, bridge, dims = 3)
+function (u::UpSample)(x::AbstractArray{T}, bridge::AbstractArray{T}) where T
+    x = u.upsample(x)
+    s1 = size(x)
+    s2 = size(bridge)
+    s = min(s1[1],s2[1])
+    #possibly match of dimensions needed here
+    return cat(x[1:s,1:s,:,:], bridge[1:s,1:s,:,:], dims = 3)
 end
 
-"""
-    Unet(channels::Int = 1)
 
-  Initializes a [UNet](https://arxiv.org/pdf/1505.04597.pdf) instance with the given number of channels, typically equal to the number of channels in the input images.
-"""
 struct Unet
-  conv_down_blocks
-  conv_blocks
-  up_blocks
+    double_conv_down_1
+    double_conv_down_2
+    double_conv_down_3
+    double_conv_down_4
+    double_conv_down_5
+    double_conv_up_1
+    double_conv_up_2
+    double_conv_up_3
+    double_conv_up_4
+    upsample_1
+    upsample_2
+    upsample_3
+    upsample_4
+    pooldrop
+    activation
 end
 
 @functor Unet
 
-function Unet(channels::Int = 3, nlabels::Int = 7)
-  conv_down_blocks = Chain(
-          ConvDown(64,64),
-		      ConvDown(128,128),
-		      ConvDown(256,256),
-		      ConvDown(512,512))
+function Unet(channels::Int = 3, nlabels::Int = 7, nfilters::Int = 16)
 
-  conv_blocks = Chain(
-     UNetConvBlock(channels, 3),
-		 UNetConvBlock(3, 64),
-		 UNetConvBlock(64, 128),
-		 UNetConvBlock(128, 256),
-		 UNetConvBlock(256, 512),
-		 UNetConvBlock(512, 1024),
-		 UNetConvBlock(1024, 1024))
+    Unet(
+        DoubleConv(channels,nfilters), # double_conv_down_1
+        DoubleConv(nfilters,2*nfilters), # double_conv_down_2
+        DoubleConv(2*nfilters,4*nfilters), # double_conv_down_3
+        DoubleConv(4*nfilters,8*nfilters), # double_conv_down_4
+        DoubleConv(8*nfilters,16*nfilters), # double_conv_down_5
+        DoubleConv(16*nfilters,8*nfilters), # double_conv_up_1
+        DoubleConv(8*nfilters,4*nfilters), # double_conv_up_2
+        DoubleConv(4*nfilters,2*nfilters), # double_conv_up_3
+        DoubleConv(2*nfilters,nfilters), # double_conv_up_4
+        UpSample(16*nfilters,8*nfilters), # upsample_1
+        UpSample(8*nfilters,4*nfilters), # upsample_2
+        UpSample(4*nfilters,2*nfilters), # upsample_3
+        UpSample(2*nfilters,nfilters), # upsample_4
+        PoolDrop(), # pooldrop
+        Conv((1, 1), nfilters=>nlabels, sigmoid) # conv_1d
+    )
 
-  up_blocks = Chain(
-    UNetUpBlock(1024, 512),
-		UNetUpBlock(1024, 256),
-		UNetUpBlock(512, 128),
-		UNetUpBlock(256, 64,p = 0.0f0),
-    Chain(x->leakyrelu.(x,0.2f0), Conv((1, 1), 128=>nlabels))
-    )									  
-  
-    
-  Unet(conv_down_blocks, conv_blocks, up_blocks)
 end
 
 function (u::Unet)(x::AbstractArray{T}) where T
-  #@info "..."
-  op = u.conv_blocks[1:2](x)
 
-  x1 = u.conv_blocks[3](u.conv_down_blocks[1](op))
+    c1 = u.double_conv_down_1(x)
+    p1 = u.pooldrop(c1)
 
-  x2 = u.conv_blocks[4](u.conv_down_blocks[2](x1))
+    c2 = u.double_conv_down_2(p1)
+    p2 = u.pooldrop(c2)
 
-  x3 = u.conv_blocks[5](u.conv_down_blocks[3](x2))
+    c3 = u.double_conv_down_3(p2)
+    p3 = u.pooldrop(c3)
 
-  x4 = u.conv_blocks[6](u.conv_down_blocks[4](x3))
+    c4 = u.double_conv_down_4(p3)
+    p4 = u.pooldrop(c4)
 
-  up_x4 = u.conv_blocks[7](x4)
+    c5 = u.double_conv_down_5(p4)
 
-  up_x1 = u.up_blocks[1](up_x4, x3)
+    u6 = u.upsample_1(c5,c4)
+    c6 = u.double_conv_up_1(u6)
 
-  up_x2 = u.up_blocks[2](up_x1, x2)
+    u7 = u.upsample_2(c6,c3)
+    c7 = u.double_conv_up_2(u7)
 
-  up_x3 = u.up_blocks[3](up_x2, x1)
+    u8 = u.upsample_3(c7,c2)
+    c8 = u.double_conv_up_3(u8)
 
-  up_x5 = u.up_blocks[4](up_x3, op)
+    u9 = u.upsample_4(c8,c1)
+    c9 = u.double_conv_up_4(u9)
 
-  ou = u.up_blocks[end](up_x5)
-  return ou
+    output = u.activation(c9)
 
-end
+    return output
 
-function Base.show(io::IO, u::Unet)
-  println(io, "UNet:")
-
-  for l in u.conv_down_blocks
-    println(io, "  ConvDown($(size(l[1].weight)[end-1]), $(size(l[1].weight)[end]))")
-  end
-
-  println(io, "\n")
-  for l in u.conv_blocks
-    println(io, "  UNetConvBlock($(size(l[1].weight)[end-1]), $(size(l[1].weight)[end]))")
-  end
-
-  println(io, "\n")
-  for l in u.up_blocks
-    l isa UNetUpBlock || continue
-    println(io, "  UNetUpBlock($(size(l.upsample[2].weight)[end]), $(size(l.upsample[2].weight)[end-1]))")
-  end
 end
