@@ -17,7 +17,7 @@ function extract_bboxes(mask)
     end
       boxes[i,:] = [y1, x1, y2, x2]
   end
-  boxes
+  return boxes
 end
 
 function extract_bboxes(masks::AbstractArray{T,4}) where T
@@ -26,7 +26,7 @@ function extract_bboxes(masks::AbstractArray{T,4}) where T
     b = extract_bboxes(masks[:,:,:,i])
     push!(bs, b)
   end
-  reduce(vcat, bs)
+  return reduce(vcat, bs)
 end
 
 expand_dims(x,n::Int) = reshape(x,ones(Int64,n)...,size(x)...)
@@ -40,13 +40,13 @@ function squeeze(x)
     end
 end
 
-function bce(ŷ, y; ϵ=gpu(fill(eps(first(ŷ)), size(ŷ)...)))
+function bce(ŷ, y; ϵ=eps(first(ŷ)))
   l1 = -y.*log.(ŷ .+ ϵ)
   l2 = (1 .- y).*log.(1 .- ŷ .+ ϵ)
-  l1 .- l2
+  return l1 .- l2
 end
 
 function loss(x, y)
   op = clamp.(u(x), 0.001f0, 1.f0)
-  mean(bce(op, y))
+  return mean(bce(op, y))
 end
