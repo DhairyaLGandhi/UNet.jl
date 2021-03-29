@@ -16,7 +16,7 @@ StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 [compat]
 Distributions = "0.20, 0.21, 0.22, 0.23"
 FileIO = "1"
-Flux = "0.10, 0.11"
+Flux = "0.10, 0.11, 0.12"
 ImageCore = "0.8"
 ImageTransformations = "0.8"
 Reexport = "0.2"
