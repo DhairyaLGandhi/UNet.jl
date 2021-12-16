@@ -81,13 +81,14 @@ end
 function(m::Upsample)(x, y)
   #todo: crop_to_factor
   g_cropped = y
-  f_cropped = crop(m(x), size(g_cropped)[:length(m.factor)])
+  # f_cropped = crop(m(x), size(g_cropped)[:length(m.factor)])
+  f_cropped = m(x)
   new_arr = cat(f_cropped, g_cropped; dims=length(m.factor)+1)
   println("CONCAT", size(new_arr)) 
   return new_arr
 end
 
-struct Unet
+struct Unet 
   num_levels
   l_conv_chain
   l_down_chain
@@ -98,34 +99,77 @@ end
 
 @functor Unet
 
+"""
 function Unet(
-  in_channels,
-  out_channels,
-  num_fmaps,
-  fmap_inc_factor,
-  downsample_factors,
-  kernel_size_down,
-  kernel_size_up,
-  activation,
-  final_activation;
-  padding="valid",
+  in_channels = 1,
+  out_channels = 1,
+  num_fmaps = 64,
+  fmap_inc_factor = 2,
+  downsample_factors = [(2,2),(2,2),(2,2),(2,2)],
+  kernel_sizes_down = [[(3,3), (3,3)], [(3,3), (3,3)], [(3,3), (3,3)], [(3,3), (3,3)], [(3,3), (3,3)]],
+  kernel_sizes_up = [[(3,3), (3,3)], [(3,3), (3,3)], [(3,3), (3,3)], [(3,3), (3,3)]],
+  activation = NNlib.relu,
+  final_activation = NNlib.relu;
+  padding="same",
   pooling_type="max"
   )
+    creates a U-net model that can then be used to be trained and to perform predictions.
+
+# Paramers
++ `in_channels`: channels of the input to the U-net
+
++ `out_channels`: channels of the output of the U-net
+
++ `num_fmaps`: number of feature maps that the input gets expanded to in the first step
+
++ `fmap_inc_factor`: the factor that the feature maps get expanded by in every level of the U-net
+
++ `downsample_factors`: vector of downsampling factors of individual U-net levels
+
++ `kernel_sizes_down`: vector of vectors of tuples of individual kernel_sizes used in the convolutions on the way down
+  e.g. 5 lists of convolutions. 4 before downsampling and one final after the downsample, each with 2 consecutive 3x3 convolutions.
+
++ `kernel_sizes_up`: vector of vectors of tuples of individual kernel_sizes used in the convolutions on the way up (backwards)
+  similar but but after each upsampling step, starting from the top, but not initial one before upsampling.
+
++ `activation`: activation function after each convolution layer
+
++ `final_activation`: activation function for the final step
+
++ `padding="valid"`: method of padding during convolution and upsampling
+
++ `pooling_type="max"`: type of pooling
+
+"""
+function Unet(
+  in_channels,# = 1,
+  out_channels,# = 1,
+  num_fmaps,# = 64,
+  fmap_inc_factor,# = 2,
+  downsample_factors,# = [(2,2),(2,2),(2,2),(2,2)],
+  kernel_sizes_down,# = [[(3,3), (3,3)], [(3,3), (3,3)], [(3,3), (3,3)], [(3,3), (3,3)], [(3,3), (3,3)]],
+  kernel_sizes_up,# = [[(3,3), (3,3)], [(3,3), (3,3)], [(3,3), (3,3)], [(3,3), (3,3)]],
+  activation,# = NNlib.relu,
+  final_activation ; # = NNlib.relu;
+  padding ="same",
+  pooling_type ="max"
+  )
+  @show downsample_factors
   num_levels = length(downsample_factors) + 1
   dims = length(downsample_factors[1])
   l_convs = Any[]
   for level in 1:num_levels
+    @show l_convs
     in_ch = (level == 1) ? in_channels : num_fmaps * fmap_inc_factor ^ (level - 2)
-    push!(l_convs, 
-      ConvBlock(in_ch, 
-                num_fmaps * fmap_inc_factor ^ (level - 1),
-                kernel_size_down[level],
-                activation=activation,
-                padding=padding
-                )
-        )
+
+    cb = ConvBlock(in_ch, 
+      num_fmaps * fmap_inc_factor ^ (level - 1),
+      kernel_sizes_down[level],
+      activation=activation,
+      padding=padding
+      )
+    push!(l_convs, cb)
   end
-  
 
   l_downs = Any[]
   for level in 1:num_levels - 1
@@ -157,13 +201,12 @@ function Unet(
         num_fmaps * fmap_inc_factor ^ (level - 1) +
         num_fmaps * fmap_inc_factor ^ level,
         num_fmaps * fmap_inc_factor ^ (level -  1),
-        kernel_size_up[level],
+        kernel_sizes_up[level],
         activation=activation,
         padding=padding
       )
     )
   end
-
 
   final_conv = ConvBlock(
     num_fmaps,
