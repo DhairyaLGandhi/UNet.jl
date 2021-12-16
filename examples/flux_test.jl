@@ -14,8 +14,14 @@ img = 10.0 .* Float32.(testimage("resolution_test_512"))
 
 # @ve nimg1 nimg2
 
-u = Unet(1, 1, 64, 2, [(2,2),(2,2),(2,2),(2,2)], [[(3,3), (3,3)], [(3,3), (3,3)], [(3,3), (3,3)], [(3,3), (3,3)], [(3,3), (3,3)]], 
-[[(3,3), (3,3)], [(3,3), (3,3)], [(3,3), (3,3)], [(3,3), (3,3)]], NNlib.relu, NNlib.relu; padding="same"); 
+# u = Unet(); 
+u = Unet(1, 1, 64, 2, [(2,2),(2,2),(2,2),(2,2)], 
+[[(3,3), (3,3)], [(3,3), (3,3)], [(3,3), (3,3)], [(3,3), (3,3)], [(3,3), (3,3)]], 
+[[(3,3), (3,3)], [(3,3), (3,3)], [(3,3), (3,3)], [(3,3), (3,3)]], 
+NNlib.relu, 
+NNlib.relu; 
+padding="same"); 
+
 u = gpu(u);
 function loss(x, y)
     # op = clamp.(u(x), 0.001f0, 1.f0)
@@ -50,4 +56,4 @@ end
 
 # apply the net to the whole image instead:
 nimg = gpu(scale.*reshape(poisson(conv_img),(size(conv_img)...,1,1)))
-@ve img nimg u(nimg)
+@ve img nimg u(nimg) conv_img
