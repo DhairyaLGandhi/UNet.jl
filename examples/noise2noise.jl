@@ -34,4 +34,5 @@ end
 
 # apply the net to the whole image instead:
 nimg = gpu(scale.*reshape(poisson(conv_img),(size(conv_img)...,1,1)))
+# display the images using View5D
 @ve img nimg u(nimg)
