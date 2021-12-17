@@ -21,7 +21,7 @@ function ConvBlock(in_channels, out_channels, kernel_sizes = [(3,3), (3,3)];
 end
 
 function (m::ConvBlock)(x)
-  println(size(x))
+  # println(size(x))
   return m.op(x)
 end
   
@@ -84,10 +84,11 @@ function(m::Upsample)(x, y)
   # f_cropped = crop(m(x), size(g_cropped)[:length(m.factor)])
   f_cropped = m(x)
   new_arr = cat(f_cropped, g_cropped; dims=length(m.factor)+1)
-  println("CONCAT", size(new_arr)) 
+  # println("CONCAT", size(new_arr)) 
   return new_arr
 end
 
+# holds the information on the unet structure
 struct Unet 
   num_levels
   l_conv_chain
@@ -100,7 +101,7 @@ end
 @functor Unet
 
 """
-function Unet(
+function Unet(;
   in_channels = 1,
   out_channels = 1,
   num_fmaps = 64,
@@ -113,7 +114,11 @@ function Unet(
   padding="same",
   pooling_type="max"
   )
-    creates a U-net model that can then be used to be trained and to perform predictions.
+    creates a U-net model that can then be used to be trained and to perform predictions. A UNet consists of an initial layer to
+    create feature maps, controlled via `num_fmaps`. This is followed by downsampling and umsampling steps,
+    which obtain information from the downsampling side of the net via skip-connections, which are automatically inserted.
+    The down- and upsampling steps contain on each level a number of consequtive convolutions controlled via the arguments `kernel_sizes_down`
+    and `kernel_sizes_up` respectively.
 
 # Paramers
 + `in_channels`: channels of the input to the U-net
@@ -140,26 +145,27 @@ function Unet(
 
 + `pooling_type="max"`: type of pooling
 
+# Example
+```jldoctest
+```
 """
-function Unet(
-  in_channels,# = 1,
-  out_channels,# = 1,
-  num_fmaps,# = 64,
-  fmap_inc_factor,# = 2,
-  downsample_factors,# = [(2,2),(2,2),(2,2),(2,2)],
-  kernel_sizes_down,# = [[(3,3), (3,3)], [(3,3), (3,3)], [(3,3), (3,3)], [(3,3), (3,3)], [(3,3), (3,3)]],
-  kernel_sizes_up,# = [[(3,3), (3,3)], [(3,3), (3,3)], [(3,3), (3,3)], [(3,3), (3,3)]],
-  activation,# = NNlib.relu,
-  final_activation ; # = NNlib.relu;
+function Unet(;  # all arguments are named and ahve defaults
+  in_channels = 1,
+  out_channels = 1,
+  num_fmaps = 64,
+  fmap_inc_factor = 2,
+  downsample_factors = [(2,2),(2,2),(2,2),(2,2)],
+  kernel_sizes_down = [[(3,3), (3,3)], [(3,3), (3,3)], [(3,3), (3,3)], [(3,3), (3,3)], [(3,3), (3,3)]],
+  kernel_sizes_up = [[(3,3), (3,3)], [(3,3), (3,3)], [(3,3), (3,3)], [(3,3), (3,3)]],
+  activation = NNlib.relu,
+  final_activation = NNlib.relu,
   padding ="same",
   pooling_type ="max"
   )
-  @show downsample_factors
   num_levels = length(downsample_factors) + 1
   dims = length(downsample_factors[1])
   l_convs = Any[]
   for level in 1:num_levels
-    @show l_convs
     in_ch = (level == 1) ? in_channels : num_fmaps * fmap_inc_factor ^ (level - 2)
 
     cb = ConvBlock(in_ch, 
@@ -181,7 +187,6 @@ function Unet(
     )
   end
   
-
   r_ups = Any[]
   for level in 1:num_levels - 1
     push!(r_ups,
@@ -192,7 +197,6 @@ function Unet(
       )
     )
   end
-
 
   r_convs = Any[]
   for level in 1:num_levels - 1
@@ -239,21 +243,21 @@ function (m::Unet)(x::AbstractArray; level=1)
   end
 end
 
-# function Base.show(io::IO, u::Unet)
-#   println(io, "UNet:")
+function Base.show(io::IO, u::Unet)
+  ws = size(u.l_conv_chain[1].op[1].weight)
+  println(io, "UNet, Input Channels: $(ws[end-1]):")
+  lvl = ""
+  for (c,d) in zip(u.l_conv_chain,u.l_down_chain)
+    println(io, "$(lvl)Conv($(c))")
+    println(io, "$(lvl)DownSample($(d.factor))")
+    lvl *= "|    "
+  end
 
-#   for l in u.conv_down_blocks
-#     println(io, "  ConvDown($(size(l[1].weight)[end-1]), $(size(l[1].weight)[end]))")
-#   end
+  for (c,d) in zip(u.l_conv_chain,u.l_down_chain)
+    println(io, "$(lvl)Conv($(c))")
+    println(io, "$(lvl)DownSample($(d.factor))")
+    lvl = lvl[1:end-4]
+  end
+  println(io, "FinalConv($(u.final_conv))")
 
-#   println(io, "\n")
-#   for l in u.conv_blocks
-#     println(io, "  UNetConvBlock($(size(l[1].weight)[end-1]), $(size(l[1].weight)[end]))")
-#   end
-
-#   println(io, "\n")
-#   for l in u.up_blocks
-#     l isa UNetUpBlock || continue
-#     println(io, "  UNetUpBlock($(size(l.upsample[2].weight)[end]), $(size(l.upsample[2].weight)[end-1]))")
-#   end
-# end
+end
