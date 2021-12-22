@@ -21,7 +21,7 @@ end
 sz = size(img); 
 scale = 0.5/maximum(img)
 patch = (128,128)
-for n in 1:1000
+for n in 1:100
     println("Iteration: $n")
     myimg, pos = get_tile(img,patch)
     # image to denoise
