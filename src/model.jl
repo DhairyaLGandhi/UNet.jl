@@ -33,6 +33,11 @@ end
 struct Downsample
   op
   factor
+  pooling_type
+end
+
+function Base.show(io::IO, d::Downsample)
+  print(io, "Unet.Downsample($(d.factor), $(d.pooling_type))")
 end
 
 @functor Downsample
@@ -42,8 +47,9 @@ function Downsample(downsample_factor; pooling_type="max")
     downop = x -> NNlib.maxpool(x, downsample_factor, pad=0)
   else
     downop = x -> NNlib.meanpool(x, downsample_factor, pad=0)
+    pooling_type = "mean"
   end
-  return Downsample(downop, downsample_factor)
+  return Downsample(downop, downsample_factor, pooling_type)
 end
 
 struct RuntimeError <: Exception end
@@ -245,19 +251,20 @@ end
 
 function Base.show(io::IO, u::Unet)
   ws = size(u.l_conv_chain[1].op[1].weight)
-  println(io, "UNet, Input Channels: $(ws[end-1]):")
+  println(io, "UNet, Input Channels: $(ws[end-1])")
   lvl = ""
-  for (c,d) in zip(u.l_conv_chain, u.l_down_chain)
-    println(io, "$(lvl)Conv($(c))")
-    println(io, "$(lvl)DownSample($(d.factor))")
-    lvl *= "|    "
+  for (c, d) in zip(u.l_conv_chain, u.l_down_chain)
+      println(io, "$(lvl)Conv: $c")
+      lvl *= "|    "
+      println(io, "$(lvl)DownSample: $d")
   end
-  println(io, "$(lvl)Conv($(u.l_conv_chain[end]))")
-  lvl = lvl[1:end-5]
-  for (c,d) in zip(u.r_conv_chain[end:-1:1], u.r_up_chain)
-    println(io, "$(lvl)UpSample($(d.factor))")
-    println(io, "$(lvl)Conv($(c))")
-    lvl = lvl[1:end-5]
+  println(io, "$(lvl)Conv: $(u.l_conv_chain[end])")
+  for (c, d) in zip(u.r_conv_chain[end:-1:1], u.r_up_chain[end:-1:1])
+      println(io, "$(lvl)UpSample: $d ")
+      println(io, "$(lvl[1:end-4])   /")
+      lvl = lvl[1:end-5]
+      println(io, "$(lvl)Concat")
+      println(io, "$(lvl)Conv: $(c)")
   end
-  println(io, "FinalConv($(u.final_conv))")
+  println(io, "FinalConv: $(u.final_conv)")
 end
