@@ -255,14 +255,17 @@ function Base.show(io::IO, u::Unet)
   lvl = ""
   for (c, d) in zip(u.l_conv_chain, u.l_down_chain)
       println(io, "$(lvl)Conv: $c")
+      println(io, "$(lvl)| \\")
+      println(io, "$(lvl)|  \\DownSample: $d")
+      println(io, "$(lvl)|   \\")
       lvl *= "|    "
-      println(io, "$(lvl)DownSample: $d")
   end
   println(io, "$(lvl)Conv: $(u.l_conv_chain[end])")
   for (c, d) in zip(u.r_conv_chain[end:-1:1], u.r_up_chain[end:-1:1])
-      println(io, "$(lvl)UpSample: $d ")
-      println(io, "$(lvl[1:end-4])   /")
       lvl = lvl[1:end-5]
+      println(io, "$(lvl)|   /")
+      println(io, "$(lvl)|  /UpSample: $d ")
+      println(io, "$(lvl)| /")
       println(io, "$(lvl)Concat")
       println(io, "$(lvl)Conv: $(c)")
   end
