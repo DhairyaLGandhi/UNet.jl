@@ -1,5 +1,6 @@
 using Flux
 using Flux: @functor
+
 struct ConvBlock
   op
 end
@@ -21,7 +22,6 @@ function ConvBlock(in_channels, out_channels, kernel_sizes = [(3,3), (3,3)];
 end
 
 function (m::ConvBlock)(x)
-  # println(size(x))
   return m.op(x)
 end
   
@@ -52,12 +52,10 @@ function Downsample(downsample_factor; pooling_type="max")
   return Downsample(downop, downsample_factor, pooling_type)
 end
 
-struct RuntimeError <: Exception end
-
 function (m::Downsample)(x)
   for (d, x_s, f_s) in zip(1: length(m.factor), size(x), m.factor)
       if (mod(x_s, f_s) !=0)
-        throw(RuntimeError("Can not downsample $(size(x)) with factor $(m.factor), mismatch in spatial dimension $d"))
+        throw(DimensionMismatch("Can not downsample $(size(x)) with factor $(m.factor), mismatch in spatial dimension $d"))
       end
   end  
   return m.op(x)
@@ -79,18 +77,22 @@ function (m::Upsample)(x)
   return m.op(x)
 end
 
-function crop(x, size)
-  target_size = size(x) 
-  offset = Tuple((a-b)÷2 for (a,b) in zip(size(x), target_size))
+function crop(x, target_size)
+  if (size(x) == target_size)
+    return x
+  else
+    offset = Tuple((a-b)÷2+1 for (a,b) in zip(size(x), target_size))
+    slice = Tuple(o:o+t-1 for (o,t) in zip(offset,target_size))
+    return x[slice...,:,:]
+  end
 end
 
 function(m::Upsample)(x, y)
   #todo: crop_to_factor
-  g_cropped = y
-  # f_cropped = crop(m(x), size(g_cropped)[:length(m.factor)])
-  f_cropped = m(x)
-  new_arr = cat(f_cropped, g_cropped; dims=length(m.factor)+1)
-  # println("CONCAT", size(new_arr)) 
+  g_up = m(x)
+  k = size(g_up)[1:length(m.factor)]
+  f_cropped = crop(y, k)
+  new_arr = cat(f_cropped, g_up; dims=length(m.factor)+1)
   return new_arr
 end
 
