@@ -37,7 +37,7 @@ struct Downsample{T1, T2, T3}
 end
 
 function Base.show(io::IO, d::Downsample)
-  print(io, "Unet.Downsample($(d.factor), $(d.pooling_type))")
+  print(io, "Downsample($(d.factor), $(d.pooling_type))")
 end
 
 @functor Downsample
