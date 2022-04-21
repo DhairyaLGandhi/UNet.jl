@@ -97,13 +97,13 @@ function(m::Upsample)(x, y)
 end
 
 # holds the information on the unet structure
-struct Unet{T1, T2, T3}
+struct Unet{T1, T2, T3, T4, T5}
   num_levels::T1
   l_conv_chain::T2
-  l_down_chain::T2
-  r_up_chain::T2
+  l_down_chain::T3
+  r_up_chain::T4
   r_conv_chain::T2
-  final_conv::T3
+  final_conv::T5
 end
 
 @functor Unet
