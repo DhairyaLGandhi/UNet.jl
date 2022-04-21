@@ -1,8 +1,8 @@
 using Flux
 using Flux: @functor
 
-struct ConvBlock
-  op
+struct ConvBlock{T}
+  op::T
 end
 
 @functor ConvBlock
@@ -30,10 +30,10 @@ end
 	# BatchNormWrap(out_chs),
 	# x->leakyrelu.(x,0.2f0))
 
-struct Downsample
-  op
-  factor
-  pooling_type
+struct Downsample{T1, T2, T3}
+  op::T1
+  factor::T2
+  pooling_type::T3
 end
 
 function Base.show(io::IO, d::Downsample)
@@ -61,9 +61,9 @@ function (m::Downsample)(x)
   return m.op(x)
 end
 
-struct Upsample
-  op
-  factor
+struct Upsample{T1, T2}
+  op::T1
+  factor::T2
 end
 
 @functor Upsample
@@ -97,13 +97,13 @@ function(m::Upsample)(x, y)
 end
 
 # holds the information on the unet structure
-struct Unet 
-  num_levels
-  l_conv_chain
-  l_down_chain
-  r_up_chain
-  r_conv_chain
-  final_conv
+struct Unet{T1, T2, T3}
+  num_levels::T1
+  l_conv_chain::T2
+  l_down_chain::T2
+  r_up_chain::T2
+  r_conv_chain::T2
+  final_conv::T3
 end
 
 @functor Unet
