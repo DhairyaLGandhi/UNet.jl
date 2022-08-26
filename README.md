@@ -50,6 +50,8 @@ julia> u = Unet(3, 5) # 3 input channels, 5 output channels.
 To train the model on UNet, it is as simple as calling `gpu` on the model.
 
 ```julia
+julia> u = Unet();
+
 julia> u = gpu(u);
 
 julia> r = gpu(rand(Float32, 256, 256, 1, 1));
@@ -62,27 +64,27 @@ julia> size(u(r))
 
 Training UNet is a breeze too.
 
-You can define your own loss function, or use a provided Binary Cross Entropy implementation via `bce`.
+You can define your own loss function, or use Flux binary cross entropy implementation.
 
 ```julia
-julia> w = rand(Float32, 256,256,1,1);
+using UNet, Flux,  Base.Iterators
+import Flux.Losses.binarycrossentropy
 
-julia> w′ = rand(Float32, 256,256,1,1);
+device = gpu #cpu
 
-julia> function loss(x, y)
-         op = clamp.(u(x), 0.001f0, 1.f0)
-         mean(bce(op, y))
-       end
-loss (generic function with 1 method)
+function loss(x, y)
+    op = clamp.(u(x), 0.001f0, 1.f0)
+    binarycrossentropy(op,y)
+end
 
-julia> using Base.Iterators
+u = Unet() |> device
+w = rand(Float32, 256, 256, 1, 1) |> device
+w′ = rand(Float32, 256, 256, 1, 1) |> device
+rep = Iterators.repeated((w, w′), 10)
 
-julia> rep = Iterators.repeated((w, w′), 10);
+opt = ADAM()
 
-julia> opt = Momentum()
-Momentum(0.01, 0.9, IdDict{Any,Any}())
-
-julia> Flux.train!(loss, Flux.params(u), rep, opt);
+Flux.train!(loss, Flux.params(u), rep, opt, cb = () -> @show(loss(w, w′)))
 ```
 
 ## Further Reading
