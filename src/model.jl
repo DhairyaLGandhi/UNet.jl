@@ -1,106 +1,275 @@
-function BatchNormWrap(out_ch)
-    Chain(x->expand_dims(x,2),
-	  BatchNorm(out_ch),
-	  x->squeeze(x))
+using Flux
+using Flux: @functor
+
+struct ConvBlock{T}
+  op::T
 end
 
-UNetConvBlock(in_chs, out_chs, kernel = (3, 3)) =
-    Chain(Conv(kernel, in_chs=>out_chs,pad = (1, 1);init=_random_normal),
-	BatchNormWrap(out_chs),
-	x->leakyrelu.(x,0.2f0))
+@functor ConvBlock
 
-ConvDown(in_chs,out_chs,kernel = (4,4)) =
-  Chain(Conv(kernel,in_chs=>out_chs,pad=(1,1),stride=(2,2);init=_random_normal),
-	BatchNormWrap(out_chs),
-	x->leakyrelu.(x,0.2f0))
-
-struct UNetUpBlock
-  upsample
+function ConvBlock(in_channels, out_channels, kernel_sizes = [(3,3), (3,3)];
+                       activation = NNlib.relu, padding = "valid")
+  pad_arg = padding == "same" ? SamePad() : 0
+  conv_layers = Any[]
+  in_channels_it = in_channels
+  for kernel_size in kernel_sizes
+    push!(conv_layers,
+      Conv(kernel_size, in_channels_it => out_channels, activation; pad=pad_arg)
+    )
+    in_channels_it = out_channels
+  end
+  return ConvBlock(Chain(conv_layers...))
 end
 
-@functor UNetUpBlock
+function (m::ConvBlock)(x)
+  return m.op(x)
+end
+  
+  # ConvBlock(in_chs, out_chs, kernel = (3, 3)) =
+  #   Chain(Conv(kernel, in_chs=>out_chs,pad = (1, 1);init=_random_normal),
+	# BatchNormWrap(out_chs),
+	# x->leakyrelu.(x,0.2f0))
 
-UNetUpBlock(in_chs::Int, out_chs::Int; kernel = (3, 3), p = 0.5f0) = 
-    UNetUpBlock(Chain(x->leakyrelu.(x,0.2f0),
-       		ConvTranspose((2, 2), in_chs=>out_chs,
-			stride=(2, 2);init=_random_normal),
-		BatchNormWrap(out_chs),
-		Dropout(p)))
-
-function (u::UNetUpBlock)(x, bridge)
-  x = u.upsample(x)
-  return cat(x, bridge, dims = 3)
+struct Downsample{T1, T2, T3}
+  op::T1
+  factor::T2
+  pooling_type::T3
 end
 
-"""
-    Unet(channels::Int = 1, labels::Int = channels)
+function Base.show(io::IO, d::Downsample)
+  print(io, "Downsample($(d.factor), $(d.pooling_type))")
+end
 
-  Initializes a [UNet](https://arxiv.org/pdf/1505.04597.pdf) instance with the given number of `channels`, typically equal to the number of channels in the input images.
-  `labels`, equal to the number of input channels by default, specifies the number of output channels.
-"""
-struct Unet
-  conv_down_blocks
-  conv_blocks
-  up_blocks
+@functor Downsample
+
+function Downsample(downsample_factor; pooling_type="max")
+  if (pooling_type == "max")
+    downop = x -> NNlib.maxpool(x, downsample_factor, pad=0)
+  else
+    downop = x -> NNlib.meanpool(x, downsample_factor, pad=0)
+    pooling_type = "mean"
+  end
+  return Downsample(downop, downsample_factor, pooling_type)
+end
+
+function (m::Downsample)(x)
+  for (d, x_s, f_s) in zip(1: length(m.factor), size(x), m.factor)
+      if (mod(x_s, f_s) !=0)
+        throw(DimensionMismatch("Can not downsample $(size(x)) with factor $(m.factor), mismatch in spatial dimension $d"))
+      end
+  end  
+  return m.op(x)
+end
+
+struct Upsample{T1, T2}
+  op::T1
+  factor::T2
+end
+
+@functor Upsample
+
+function Upsample(scale_factor, in_channels, out_channels)
+  upop = ConvTranspose(scale_factor, in_channels=>out_channels, stride=scale_factor)
+  return Upsample(upop, scale_factor)
+end
+
+function (m::Upsample)(x)
+  return m.op(x)
+end
+
+function crop(x, target_size)
+  if (size(x) == target_size)
+    return x
+  else
+    offset = Tuple((a-b)÷2+1 for (a,b) in zip(size(x), target_size))
+    slice = Tuple(o:o+t-1 for (o,t) in zip(offset,target_size))
+    return x[slice...,:,:]
+  end
+end
+
+function(m::Upsample)(x, y)
+  #todo: crop_to_factor
+  g_up = m(x)
+  k = size(g_up)[1:length(m.factor)]
+  f_cropped = crop(y, k)
+  new_arr = cat(f_cropped, g_up; dims=length(m.factor)+1)
+  return new_arr
+end
+
+# holds the information on the unet structure
+struct Unet{T1, T2, T3, T4, T5, T6}
+  num_levels::T1
+  l_conv_chain::T2
+  l_down_chain::T3
+  r_up_chain::T4
+  r_conv_chain::T5
+  final_conv::T6
 end
 
 @functor Unet
 
-function Unet(channels::Int = 1, labels::Int = channels)
-  conv_down_blocks = Chain(ConvDown(64,64),
-		      ConvDown(128,128),
-		      ConvDown(256,256),
-		      ConvDown(512,512))
+"""
+function Unet(;
+  in_channels = 1,
+  out_channels = 1,
+  num_fmaps = 64,
+  fmap_inc_factor = 2,
+  downsample_factors = [(2,2),(2,2),(2,2),(2,2)],
+  kernel_sizes_down = [[(3,3), (3,3)], [(3,3), (3,3)], [(3,3), (3,3)], [(3,3), (3,3)], [(3,3), (3,3)]],
+  kernel_sizes_up = [[(3,3), (3,3)], [(3,3), (3,3)], [(3,3), (3,3)], [(3,3), (3,3)]],
+  activation = NNlib.relu,
+  final_activation = NNlib.relu;
+  padding="same",
+  pooling_type="max"
+  )
+    creates a U-net model that can then be used to be trained and to perform predictions. A UNet consists of an initial layer to
+    create feature maps, controlled via `num_fmaps`. This is followed by downsampling and umsampling steps,
+    which obtain information from the downsampling side of the net via skip-connections, which are automatically inserted.
+    The down- and upsampling steps contain on each level a number of consequtive convolutions controlled via the arguments `kernel_sizes_down`
+    and `kernel_sizes_up` respectively.
 
-  conv_blocks = Chain(UNetConvBlock(channels, 3),
-		 UNetConvBlock(3, 64),
-		 UNetConvBlock(64, 128),
-		 UNetConvBlock(128, 256),
-		 UNetConvBlock(256, 512),
-		 UNetConvBlock(512, 1024),
-		 UNetConvBlock(1024, 1024))
+# Paramers
++ `in_channels`: channels of the input to the U-net
 
-  up_blocks = Chain(UNetUpBlock(1024, 512),
-		UNetUpBlock(1024, 256),
-		UNetUpBlock(512, 128),
-		UNetUpBlock(256, 64,p = 0.0f0),
-		Chain(x->leakyrelu.(x,0.2f0),
-		Conv((1, 1), 128=>labels;init=_random_normal)))									  
-  Unet(conv_down_blocks, conv_blocks, up_blocks)
++ `out_channels`: channels of the output of the U-net
+
++ `num_fmaps`: number of feature maps that the input gets expanded to in the first step
+
++ `fmap_inc_factor`: the factor that the feature maps get expanded by in every level of the U-net
+
++ `downsample_factors`: vector of downsampling factors of individual U-net levels
+
++ `kernel_sizes_down`: vector of vectors of tuples of individual kernel_sizes used in the convolutions on the way down
+  e.g. 5 lists of convolutions. 4 before downsampling and one final after the downsample, each with 2 consecutive 3x3 convolutions.
+
++ `kernel_sizes_up`: vector of vectors of tuples of individual kernel_sizes used in the convolutions on the way up (backwards)
+  similar but but after each upsampling step, starting from the top, but not initial one before upsampling.
+
++ `activation`: activation function after each convolution layer
+
++ `final_activation`: activation function for the final step
+
++ `padding="valid"`: method of padding during convolution and upsampling
+
++ `pooling_type="max"`: type of pooling
+
+# Example
+```jldoctest
+```
+"""
+function Unet(;  # all arguments are named and ahve defaults
+  in_channels = 1,
+  out_channels = 1,
+  num_fmaps = 64,
+  fmap_inc_factor = 2,
+  downsample_factors = [(2,2),(2,2),(2,2),(2,2)],
+  kernel_sizes_down = [[(3,3), (3,3)], [(3,3), (3,3)], [(3,3), (3,3)], [(3,3), (3,3)], [(3,3), (3,3)]],
+  kernel_sizes_up = [[(3,3), (3,3)], [(3,3), (3,3)], [(3,3), (3,3)], [(3,3), (3,3)]],
+  activation = NNlib.relu,
+  final_activation = NNlib.relu,
+  padding ="same",
+  pooling_type ="max"
+  )
+  num_levels = length(downsample_factors) + 1
+  dims = length(downsample_factors[1])
+  l_convs = Any[]
+  for level in 1:num_levels
+    in_ch = (level == 1) ? in_channels : num_fmaps * fmap_inc_factor ^ (level - 2)
+
+    cb = ConvBlock(in_ch, 
+      num_fmaps * fmap_inc_factor ^ (level - 1),
+      kernel_sizes_down[level],
+      activation=activation,
+      padding=padding
+      )
+    push!(l_convs, cb)
+  end
+
+  l_downs = Any[]
+  for level in 1:num_levels - 1
+    push!(l_downs,
+      Downsample(
+        downsample_factors[level];
+        pooling_type=pooling_type
+      )
+    )
+  end
+  
+  r_ups = Any[]
+  for level in 1:num_levels - 1
+    push!(r_ups,
+      Upsample(
+        downsample_factors[level],
+        num_fmaps * fmap_inc_factor ^ level,
+        num_fmaps * fmap_inc_factor ^ level
+      )
+    )
+  end
+
+  r_convs = Any[]
+  for level in 1:num_levels - 1
+    push!(r_convs,
+      ConvBlock(
+        num_fmaps * fmap_inc_factor ^ (level - 1) +
+        num_fmaps * fmap_inc_factor ^ level,
+        num_fmaps * fmap_inc_factor ^ (level -  1),
+        kernel_sizes_up[level],
+        activation=activation,
+        padding=padding
+      )
+    )
+  end
+
+  final_conv = ConvBlock(
+    num_fmaps,
+    out_channels,
+    [Tuple(1 for i in 1:dims)],
+    activation=final_activation,
+    padding=padding
+  )
+  return Unet(num_levels, l_convs, l_downs, r_ups, r_convs, final_conv)
 end
 
-function (u::Unet)(x::AbstractArray)
-  op = u.conv_blocks[1:2](x)
 
-  x1 = u.conv_blocks[3](u.conv_down_blocks[1](op))
-  x2 = u.conv_blocks[4](u.conv_down_blocks[2](x1))
-  x3 = u.conv_blocks[5](u.conv_down_blocks[3](x2))
-  x4 = u.conv_blocks[6](u.conv_down_blocks[4](x3))
-
-  up_x4 = u.conv_blocks[7](x4)
-
-  up_x1 = u.up_blocks[1](up_x4, x3)
-  up_x2 = u.up_blocks[2](up_x1, x2)
-  up_x3 = u.up_blocks[3](up_x2, x1)
-  up_x5 = u.up_blocks[4](up_x3, op)
-  tanh.(u.up_blocks[end](up_x5))
+function (m::Unet)(x::AbstractArray; level=1)
+  f_left = m.l_conv_chain[level](x)
+  fs_out = let
+      if (level == m.num_levels)
+        f_left
+      else
+        g_in = m.l_down_chain[level](f_left)
+        gs_out = m(g_in; level=level+1)
+        fs_right = m.r_up_chain[level](gs_out, f_left)
+        m.r_conv_chain[level](fs_right)
+      end
+    end
+  
+  if (level == 1)
+    return m.final_conv(fs_out)
+  else
+    return fs_out
+  end
 end
 
 function Base.show(io::IO, u::Unet)
-  println(io, "UNet:")
-
-  for l in u.conv_down_blocks
-    println(io, "  ConvDown($(size(l[1].weight)[end-1]), $(size(l[1].weight)[end]))")
+  ws = size(u.l_conv_chain[1].op[1].weight)
+  println(io, "UNet, Input Channels: $(ws[end-1])")
+  lvl = ""
+  for (c, d) in zip(u.l_conv_chain, u.l_down_chain)
+      println(io, "$(lvl)Conv: $c")
+      println(io, "$(lvl)| \\")
+      println(io, "$(lvl)|  \\DownSample: $d")
+      println(io, "$(lvl)|   \\")
+      lvl *= "|    "
   end
-
-  println(io, "\n")
-  for l in u.conv_blocks
-    println(io, "  UNetConvBlock($(size(l[1].weight)[end-1]), $(size(l[1].weight)[end]))")
+  println(io, "$(lvl)Conv: $(u.l_conv_chain[end])")
+  for (c, d) in zip(u.r_conv_chain[end:-1:1], u.r_up_chain[end:-1:1])
+      lvl = lvl[1:end-5]
+      println(io, "$(lvl)|   /")
+      println(io, "$(lvl)|  /UpSample: $d ")
+      println(io, "$(lvl)| /")
+      println(io, "$(lvl)Concat")
+      println(io, "$(lvl)Conv: $(c)")
   end
-
-  println(io, "\n")
-  for l in u.up_blocks
-    l isa UNetUpBlock || continue
-    println(io, "  UNetUpBlock($(size(l.upsample[2].weight)[end]), $(size(l.upsample[2].weight)[end-1]))")
-  end
+  println(io, "FinalConv: $(u.final_conv)")
 end

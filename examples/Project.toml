@@ -1,0 +1,9 @@
+[deps]
+Flux = "587475ba-b771-5e3f-ad9e-33799f191a9c"
+FourierTools = "b18b359b-aebc-45ac-a139-9c0ccbb2871e"
+ImageIO = "82e4d734-157c-48bb-816b-45c225c6df19"
+IndexFunArrays = "613c443e-d742-454e-bfc6-1d7f8dd76566"
+NDTools = "98581153-e998-4eef-8d0d-5ec2c052313d"
+Noise = "81d43f40-5267-43b7-ae1c-8b967f377efa"
+TestImages = "5e47fb64-e119-507b-a336-dd2b206d9990"
+View5D = "90d841e0-6953-4e90-9f3a-43681da8e949"
